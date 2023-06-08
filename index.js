@@ -49,6 +49,7 @@ async function run() {
     const usersCollection = client.db('bistroDB').collection("users")
     const reviewsCollection = client.db('bistroDB').collection("reviews")
     const cartsCollection = client.db('bistroDB').collection("carts")
+    const paymentCollection = client.db('bistroDB').collection("payment")
 
 
     app.post('/jwt',(req, res)=>{
@@ -176,17 +177,27 @@ app.delete('/carts/:id',async(req, res)=>{
   })
 
   // create payment intent
-app.post('/create-payment-intent',verifyJwt, async(req, res)=>{
-  const {price} = req.body;
-  const ammount = price*100 
-  const paymentIntent = await stripe.paymentIntents.create({
-    amount: ammount,
-    currency: "usd",
-    payment_method_types: ['card']
-  });
-  res.send({
-    clientSecret : paymentIntent.client_secret
+  app.post('/create-payment-intent', verifyJwt, async (req, res) => {
+    const { price } = req.body;
+    const amount = parseInt(price * 100);
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amount,
+      currency: 'usd',
+      payment_method_types: ['card']
+    });
+
+    res.send({
+      clientSecret: paymentIntent.client_secret
+    })
   })
+// payment related api
+app.post('/payment',verifyJwt, async(req, res)=>{
+  const payment = req.body;
+  const insertResult = await paymentCollection.insertOne(payment)
+
+  const query = {_id : {$in: payment.cartItems.map(id => new ObjectId(id))}}
+  const deleteResult = await cartsCollection.deleteMany(query)
+  res.send({ insertResult, deleteResult})
 })
 
     // Send a ping to confirm a successful connection
